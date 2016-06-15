@@ -7,11 +7,6 @@ The following examples illustrate some basic SNR calculations on diffusion-weigh
 <li>For all the b=0 images, compute the standard deviation of each voxel. This will generate a noise map, but the map will be both biased and unreliable, due to the fact that there are only a few values used to estimate the stdev.</li>
 
 <li>Correct the unreliability and bias by combining the stdev estimates across voxels. The common way to calculate the combined standard deviation of two sub samples of a common group is shown in the next equation<sup>[1]</sup>.
-<br/><br/>
-
-$$ \sigma_{1,2} = \sqrt{ \frac{n_1 \sigma_1^2 + n_2 \sigma_2^2 + n_1 (\mu_1 - \mu_{1,2})^2 + n_2 (\mu_2 - \mu_{1,2})^2}{n_1 + n_2}} $$
-
-<br/>
 To define which voxels should be combined, use a patch based non-local means approach<sup>[2]</sup>. The non-local mean algorithms finds surrounding voxels with the same intensity.</li>
 
 <li>For SNR of the non-DWIs (b=0 images), take the mean of all b0 images and divide by the noise estimate</li>
