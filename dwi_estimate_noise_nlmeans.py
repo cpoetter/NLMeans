@@ -4,21 +4,30 @@
 # # Computing SNR for diffusion-weighted imaging
 # The following examples illustrate some basic SNR calculations on diffusion-weighted images (DWIs). The basic procedure is:
 # 
-# 1. Correct for motion and for eddy current distortion, if necessary (i.e., if using single spin echo DWI; we use FSL's 'eddy')
+# <ol>
+# <li>Correct for motion and for eddy current distortion, if necessary (i.e., if using single spin echo DWI; we use FSL's 'eddy')</li>
 # 
-# 2. For all the b=0 images, compute the standard deviation of each voxel. This will generate a noise map, but the map will be both biased and unreliable, due to the fact that there are only a few values used to estimate the stdev.
+# <li>For all the b=0 images, compute the standard deviation of each voxel. This will generate a noise map, but the map will be both biased and unreliable, due to the fact that there are only a few values used to estimate the stdev.</li>
 # 
-# 4. Correct the unreliability and bias by combining the stdev estimates across voxels. The common way to calculate the combined standard deviation of two sub samples of a common group is shown in the next equation [Headrick, T. C. (2010). Statistical Simulation: Power Method Polynomials and other Transformations. Boca Raton, FL: Chapman & Hall/CRC., page 137, Equation 5.38].  
+# <li>Correct the unreliability and bias by combining the stdev estimates across voxels. The common way to calculate the combined standard deviation of two sub samples of a common group is shown in the next equation<sup>[1]</sup>.
+# <br/><br/>
 # 
 # $$ \sigma_{1,2} = \sqrt{ \frac{n_1 \sigma_1^2 + n_2 \sigma_2^2 + n_1 (\mu_1 - \mu_{1,2})^2 + n_2 (\mu_2 - \mu_{1,2})^2}{n_1 + n_2}} $$
 # 
-# To define which voxels should be combined, use a patch based Non-local means approach.
+# <br/>
+# To define which voxels should be combined, use a patch based non-local means approach<sup>[2]</sup>. The non-local mean algorithms finds surrounding voxels with the same intensity.</li>
 # 
-# 4. For SNR of the non-DWIs (b=0 images), take the mean of all b0 images and divide by the noise estimate
+# <li>For SNR of the non-DWIs (b=0 images), take the mean of all b0 images and divide by the noise estimate</li>
 # 
-# 5. For DWI SNR it's a little less clear what's best. A simple option is to use max across all the DWIs. That works OK for data with relatively high SNR, but could really over-estimate SNR for data where the true SNR is low. This is something I think we should discuss and try to come up with a better metric.
+# <li>For DWI SNR it's a little less clear what's best. A simple option is to use max across all the DWIs. That works OK for data with relatively high SNR, but could really over-estimate SNR for data where the true SNR is low. This is something I think we should discuss and try to come up with a better metric.</li>
 # 
-# 6. The thermal noise map is estimated with a PCA approach.
+# <li>The thermal noise map is estimated with a PCA decomposition<sup>[3]</sup>. The part of the decomposition containing the least varying signal is used for the thermal noise.</li>
+# </ol>
+# 
+# 
+# <sup>[1]</sup> <i>[Headrick, T. C. (2010). Statistical Simulation: Power Method Polynomials and other Transformations. Boca Raton, FL: Chapman & Hall/CRC., page 137, Equation 5.38]</i><br/>
+# <sup>[2]</sup> <i>[P. Coupe, P. Yger, S. Prima, P. Hellier, C. Kervrann, C. Barillot, “An Optimized Blockwise Non Local Means Denoising Filter for 3D Magnetic Resonance Images”, IEEE Transactions on Medical Imaging, 27(4):425-441, 2008]</i><br/>
+# <sup>[3]</sup> <i>[Diffusion Weighted Image Denoising Using Overcomplete Local PCA,  Manjon JV, Coupe P, Concha L, Buades A, Collins DL]</i><br/>
 
 # In[1]:
 
@@ -97,9 +106,7 @@ def load_data(nifti_basename):
 
 # In[8]:
 
-def show_snr_maps(nifti_basename, mask, figsize=(14,4)):
-    # wm_thresh: Percentile for thresholding mean dwi maps to get a crude WM mask. Higher values give smaller masks.
-    
+def show_snr_maps(nifti_basename, mask, figsize=(14,4)):    
     data, b0s, affine, dwi_sig = load_data(nifti_basename)
     noise_sm = smooth_data(data, b0s, mask)
     
@@ -114,14 +121,14 @@ def show_snr_maps(nifti_basename, mask, figsize=(14,4)):
     dwi_mean_snr = dwi_snr[mask==1].mean()
     
     fig = plt.figure(figsize=figsize)
-    ip_utils.show_brain(nib.Nifti1Image(thermal_noise,affine), sl=sl, fig=fig, cmap='hot')
-    plt.colorbar().set_label('Standard Deviation', rotation=270, verticalalignment='center', fontsize=14)
-    plt.title('Thermal noise map')
-    
-    fig = plt.figure(figsize=figsize)
     ip_utils.show_brain(nib.Nifti1Image(b0_sig,affine), sl=sl, fig=fig, cmap='gray')
     plt.colorbar().set_label('Signal (arb.)', rotation=270, verticalalignment='center', fontsize=14)
     plt.title('Mean b=0 image')
+    
+    fig = plt.figure(figsize=figsize)
+    ip_utils.show_brain(nib.Nifti1Image(thermal_noise,affine), sl=sl, fig=fig, cmap='hot')
+    plt.colorbar().set_label('Standard Deviation', rotation=270, verticalalignment='center', fontsize=14)
+    plt.title('Thermal noise map')
 
     fig = plt.figure(figsize=figsize)
     ip_utils.show_brain(nib.Nifti1Image(noise_sm,affine), sl=sl, fig=fig, cmap='hot')
@@ -241,6 +248,8 @@ def local_pcb(data, b0s):
         noise_mean_map[x, y, z] = result_value[3]
 
     smoothed_noise_map2 = sp.signal.medfilt(smoothed_noise_map, 3)
+    #smoothed_noise_map2 = nlmeans_std(smoothed_noise_map, estimate_sigma(smoothed_noise_map, N=0), noise_mean_map, patch_radius=0.5, block_radius=1, num_threads=None, rician=False)
+    
     return smoothed_noise_map2
 
 
